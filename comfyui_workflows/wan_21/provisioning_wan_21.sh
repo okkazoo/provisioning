@@ -14,22 +14,22 @@ NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
 )
 
-# Models placed in /workspace/models/checkpoints
+# Diffusion Models placed in /opt/ComfyUI/models/diffusion_models
 CHECKPOINT_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_fp16.safetensors"
 )
 
-# VAE Models placed in /workspace/models/vae
+# VAE Models placed in /opt/ComfyUI/models/vae
 VAE_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 )
 
-# CLIP Vision Models placed in /workspace/models/clip_vision
+# CLIP Vision Models placed in /opt/ComfyUI/models/clip_vision
 CLIP_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors"
 )
 
-# Text Encoder Models placed in /workspace/models/text_encoders
+# Text Encoder Models placed in /opt/ComfyUI/models/text_encoders
 TEXT_ENCODERS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 )
@@ -61,6 +61,8 @@ function provisioning_start() {
     provisioning_get_nodes
     provisioning_get_pip_packages
 
+    # Download models to AI-Dock storage directories (WORKSPACE=/opt/)
+    # AI-Dock pre-configures symlinks from /opt/ComfyUI/models/ to /opt/storage/stable_diffusion/models/
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/ckpt" "${CHECKPOINT_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/vae" "${VAE_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision" "${CLIP_MODELS[@]}"
