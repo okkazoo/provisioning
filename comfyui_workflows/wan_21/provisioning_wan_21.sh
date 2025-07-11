@@ -66,10 +66,10 @@ function provisioning_start() {
     provisioning_ensure_symlinks
     
     # Download models to appropriate directories
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models/Wan2.1" "${CHECKPOINT_MODELS[@]}"
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models" "${CHECKPOINT_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/vae" "${VAE_MODELS[@]}"
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision" "${CLIP_MODELS[@]}"
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/text_encoders" "${TEXT_ENCODERS[@]}"
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision_wan" "${CLIP_MODELS[@]}"
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/text_encoders_wan" "${TEXT_ENCODERS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/unet" "${UNET_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/lora" "${LORA_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/controlnet" "${CONTROLNET_MODELS[@]}"
@@ -192,55 +192,70 @@ function provisioning_download() {
 }
 
 function provisioning_ensure_symlinks() {
-    # Generic function to auto-create symlinks for any model directories used in this script
-    # Define all possible model directories that might need symlinks
-    local model_dirs=(
-        "checkpoints:ckpt"
+    # Wan 2.1 specific symlink setup
+    printf "Setting up Wan 2.1 model directory symlinks...\n"
+    
+    # Create storage directories for Wan 2.1 models
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models"
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/clip_vision_wan"
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/text_encoders_wan"
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/vae"
+    
+    # Define Wan 2.1 specific directory mappings
+    local wan_dirs=(
         "diffusion_models:diffusion_models"
-        "clip_vision:clip_vision"
-        "text_encoders:text_encoders"
+        "clip_vision:clip_vision_wan"
+        "text_encoders:text_encoders_wan"
         "vae:vae"
-        "unet:unet"
-        "lora:lora"
-        "controlnet:controlnet"
-        "upscale_models:esrgan"
-        "embeddings:embeddings"
-        "hypernetworks:hypernetworks"
-        "style_models:style_models"
-        "gligen:gligen"
-        "photomaker:photomaker"
-        "vae_approx:vae_approx"
     )
     
-    printf "Ensuring symlinks for required model directories...\n"
-    
-    for dir_mapping in "${model_dirs[@]}"; do
+    for dir_mapping in "${wan_dirs[@]}"; do
         comfyui_dir="${dir_mapping%%:*}"
         storage_dir="${dir_mapping##*:}"
         
         comfyui_path="/opt/ComfyUI/models/${comfyui_dir}"
         storage_path="${WORKSPACE}/storage/stable_diffusion/models/${storage_dir}"
         
-        # Check if this directory is actually used by examining if storage path exists or will be created
-        if [[ -d "$storage_path" ]] || grep -q "$storage_path" "$0" 2>/dev/null; then
-            # Create storage directory
-            mkdir -p "$storage_path"
-            
-            # Create symlink if it doesn't exist or points to wrong location
-            if [[ ! -L "$comfyui_path" ]] || [[ "$(readlink "$comfyui_path")" != "$storage_path" ]]; then
-                # Remove existing file/directory if it's not a symlink to the right place
-                if [[ -e "$comfyui_path" ]] && [[ ! -L "$comfyui_path" || "$(readlink "$comfyui_path")" != "$storage_path" ]]; then
-                    rm -rf "$comfyui_path"
-                fi
-                
-                ln -sf "$storage_path" "$comfyui_path"
-                printf "  Created symlink: %s -> %s\n" "$comfyui_path" "$storage_path"
-            fi
+        # Remove existing placeholder files
+        if [[ -f "${comfyui_path}/put_${comfyui_dir}_here" ]]; then
+            rm -f "${comfyui_path}/put_${comfyui_dir}_here"
         fi
+        if [[ -f "${comfyui_path}/put_${comfyui_dir}_model_files_here" ]]; then
+            rm -f "${comfyui_path}/put_${comfyui_dir}_model_files_here"
+        fi
+        if [[ -f "${comfyui_path}/put_text_encoder_files_here" ]]; then
+            rm -f "${comfyui_path}/put_text_encoder_files_here"
+        fi
+        if [[ -f "${comfyui_path}/put_clip_vision_models_here" ]]; then
+            rm -f "${comfyui_path}/put_clip_vision_models_here"
+        fi
+        if [[ -f "${comfyui_path}/put_diffusion_model_files_here" ]]; then
+            rm -f "${comfyui_path}/put_diffusion_model_files_here"
+        fi
+        if [[ -f "${comfyui_path}/put_vae_here" ]]; then
+            rm -f "${comfyui_path}/put_vae_here"
+        fi
+        
+        # Create individual file symlinks for each model that will be downloaded
+        case "$comfyui_dir" in
+            "diffusion_models")
+                ln -sf "${storage_path}/wan2.1_i2v_480p_14B_fp16.safetensors" "${comfyui_path}/wan2.1_i2v_480p_14B_fp16.safetensors"
+                printf "  Created symlink: %s/wan2.1_i2v_480p_14B_fp16.safetensors -> %s/wan2.1_i2v_480p_14B_fp16.safetensors\n" "$comfyui_path" "$storage_path"
+                ;;
+            "clip_vision")
+                ln -sf "${storage_path}/clip_vision_h.safetensors" "${comfyui_path}/clip_vision_h.safetensors"
+                printf "  Created symlink: %s/clip_vision_h.safetensors -> %s/clip_vision_h.safetensors\n" "$comfyui_path" "$storage_path"
+                ;;
+            "text_encoders")
+                ln -sf "${storage_path}/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "${comfyui_path}/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+                printf "  Created symlink: %s/umt5_xxl_fp8_e4m3fn_scaled.safetensors -> %s/umt5_xxl_fp8_e4m3fn_scaled.safetensors\n" "$comfyui_path" "$storage_path"
+                ;;
+            "vae")
+                # VAE already has proper AI-Dock symlinks, just ensure the file will be there
+                printf "  VAE directory already configured by AI-Dock\n"
+                ;;
+        esac
     done
-    
-    # Special handling for subdirectories (like Wan2.1)
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models/Wan2.1"
 }
 
 provisioning_start
