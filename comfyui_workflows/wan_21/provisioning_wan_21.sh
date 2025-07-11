@@ -68,8 +68,8 @@ function provisioning_start() {
     # Download models to appropriate directories
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models" "${CHECKPOINT_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/vae" "${VAE_MODELS[@]}"
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision_wan" "${CLIP_MODELS[@]}"
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/text_encoders_wan" "${TEXT_ENCODERS[@]}"
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision" "${CLIP_MODELS[@]}"
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/text_encoders" "${TEXT_ENCODERS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/unet" "${UNET_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/lora" "${LORA_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/controlnet" "${CONTROLNET_MODELS[@]}"
