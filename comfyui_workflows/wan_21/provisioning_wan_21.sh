@@ -197,15 +197,15 @@ function provisioning_ensure_symlinks() {
     
     # Create storage directories for Wan 2.1 models
     mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models"
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/clip_vision_wan"
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/text_encoders_wan"
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/clip_vision"
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/text_encoders"
     mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/vae"
     
     # Define Wan 2.1 specific directory mappings
     local wan_dirs=(
         "diffusion_models:diffusion_models"
-        "clip_vision:clip_vision_wan"
-        "text_encoders:text_encoders_wan"
+        "clip_vision:clip_vision"
+        "text_encoders:text_encoders"
         "vae:vae"
     )
     
