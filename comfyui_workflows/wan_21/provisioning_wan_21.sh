@@ -62,8 +62,11 @@ function provisioning_start() {
     provisioning_get_pip_packages
 
     # Download models to AI-Dock storage directories (WORKSPACE=/opt/)
-    # AI-Dock pre-configures symlinks from /opt/ComfyUI/models/ to /opt/storage/stable_diffusion/models/
-    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/ckpt" "${CHECKPOINT_MODELS[@]}"
+    # Auto-create symlinks for any required model directories
+    provisioning_ensure_symlinks
+    
+    # Download models to appropriate directories
+    provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models/Wan2.1" "${CHECKPOINT_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/vae" "${VAE_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/clip_vision" "${CLIP_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/text_encoders" "${TEXT_ENCODERS[@]}"
@@ -186,6 +189,58 @@ function provisioning_download() {
     else
         wget -qnc --content-disposition --show-progress -e dotbytes="${3:-4M}" -P "$2" "$1"
     fi
+}
+
+function provisioning_ensure_symlinks() {
+    # Generic function to auto-create symlinks for any model directories used in this script
+    # Define all possible model directories that might need symlinks
+    local model_dirs=(
+        "checkpoints:ckpt"
+        "diffusion_models:diffusion_models"
+        "clip_vision:clip_vision"
+        "text_encoders:text_encoders"
+        "vae:vae"
+        "unet:unet"
+        "lora:lora"
+        "controlnet:controlnet"
+        "upscale_models:esrgan"
+        "embeddings:embeddings"
+        "hypernetworks:hypernetworks"
+        "style_models:style_models"
+        "gligen:gligen"
+        "photomaker:photomaker"
+        "vae_approx:vae_approx"
+    )
+    
+    printf "Ensuring symlinks for required model directories...\n"
+    
+    for dir_mapping in "${model_dirs[@]}"; do
+        comfyui_dir="${dir_mapping%%:*}"
+        storage_dir="${dir_mapping##*:}"
+        
+        comfyui_path="/opt/ComfyUI/models/${comfyui_dir}"
+        storage_path="${WORKSPACE}/storage/stable_diffusion/models/${storage_dir}"
+        
+        # Check if this directory is actually used by examining if storage path exists or will be created
+        if [[ -d "$storage_path" ]] || grep -q "$storage_path" "$0" 2>/dev/null; then
+            # Create storage directory
+            mkdir -p "$storage_path"
+            
+            # Create symlink if it doesn't exist or points to wrong location
+            if [[ ! -L "$comfyui_path" ]] || [[ "$(readlink "$comfyui_path")" != "$storage_path" ]]; then
+                # Remove existing file/directory if it's not a symlink to the right place
+                if [[ -e "$comfyui_path" ]] && [[ ! -L "$comfyui_path" || "$(readlink "$comfyui_path")" != "$storage_path" ]]; then
+                    rm -rf "$comfyui_path"
+                fi
+                
+                ln -sf "$storage_path" "$comfyui_path"
+                printf "  Created symlink: %s -> %s\n" "$comfyui_path" "$storage_path"
+            fi
+        fi
+    done
+    
+    # Special handling for subdirectories (like Wan2.1)
+    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models/Wan2.1"
 }
 
 provisioning_start
