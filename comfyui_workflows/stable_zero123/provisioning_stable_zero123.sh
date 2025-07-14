@@ -25,6 +25,7 @@ NODES=(
 # - For specialized workflows, you may need to customize the storage paths in provisioning_start()
 #
 CHECKPOINT_MODELS=(
+    "https://huggingface.co/stabilityai/stable-zero123/resolve/main/stable_zero123.ckpt"
     # Add checkpoint/diffusion model URLs
     # Downloads to: ${WORKSPACE}/storage/stable_diffusion/models/ckpt
 )
