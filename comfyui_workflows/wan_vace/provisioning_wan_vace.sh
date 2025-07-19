@@ -66,8 +66,6 @@ function provisioning_start() {
 
     # Download models to AI-Dock storage directories (WORKSPACE=/opt/)
     # Auto-create symlinks for any required model directories
-    provisioning_ensure_symlinks
-    
     # Download models to appropriate directories
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models" "${CHECKPOINT_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/vae" "${VAE_MODELS[@]}"
@@ -78,6 +76,9 @@ function provisioning_start() {
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/controlnet" "${CONTROLNET_MODELS[@]}"
     provisioning_get_models "${WORKSPACE}/storage/stable_diffusion/models/esrgan" "${ESRGAN_MODELS[@]}"
 
+    # Auto-create symlinks for any required model directories
+    provisioning_ensure_symlinks
+    
     provisioning_print_end
 }
 
@@ -195,6 +196,7 @@ function provisioning_download() {
 }
 
 function provisioning_ensure_symlinks() {
+    mkdir -p /opt/ComfyUI/models/
     # Generic function to auto-create symlinks for any model directories used in this script
     # Maps ComfyUI expected directories to AI-Dock storage directories
     local model_dirs=(
@@ -257,3 +259,4 @@ function provisioning_ensure_symlinks() {
 }
 
 provisioning_start
+
