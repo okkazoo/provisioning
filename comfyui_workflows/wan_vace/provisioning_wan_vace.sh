@@ -195,69 +195,64 @@ function provisioning_download() {
 }
 
 function provisioning_ensure_symlinks() {
-    # Wan 2.1 specific symlink setup
-    printf "Setting up Wan 2.1 model directory symlinks...\n"
-    
-    # Create storage directories for Wan 2.1 models
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/diffusion_models"
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/clip_vision"
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/text_encoders"
-    mkdir -p "${WORKSPACE}/storage/stable_diffusion/models/vae"
-    
-    # Define Wan 2.1 specific directory mappings
-    local wan_dirs=(
+    # Generic function to auto-create symlinks for any model directories used in this script
+    # Maps ComfyUI expected directories to AI-Dock storage directories
+    local model_dirs=(
+        "checkpoints:ckpt"
         "diffusion_models:diffusion_models"
         "clip_vision:clip_vision"
         "text_encoders:text_encoders"
         "vae:vae"
+        "unet:unet"
+        "lora:lora"
+        "controlnet:controlnet"
+        "upscale_models:esrgan"
+        "embeddings:embeddings"
+        "hypernetworks:hypernetworks"
+        "style_models:style_models"
+        "gligen:gligen"
+        "photomaker:photomaker"
+        "vae_approx:vae_approx"
     )
     
-    for dir_mapping in "${wan_dirs[@]}"; do
+    printf "Ensuring symlinks for required model directories...\n"
+    
+    for dir_mapping in "${model_dirs[@]}"; do
         comfyui_dir="${dir_mapping%%:*}"
         storage_dir="${dir_mapping##*:}"
         
         comfyui_path="/opt/ComfyUI/models/${comfyui_dir}"
         storage_path="${WORKSPACE}/storage/stable_diffusion/models/${storage_dir}"
         
-        # Remove existing placeholder files
-        if [[ -f "${comfyui_path}/put_${comfyui_dir}_here" ]]; then
-            rm -f "${comfyui_path}/put_${comfyui_dir}_here"
+        # Check if this directory is actually used by examining if storage path exists or will be created
+        if [[ -d "$storage_path" ]] || grep -q "$storage_path" "$0" 2>/dev/null; then
+            # Create storage directory
+            mkdir -p "$storage_path"
+            
+            # Remove AI-Dock placeholder files that may interfere
+            find "$comfyui_path" -name "put_*_here" -type f -delete 2>/dev/null || true
+            find "$comfyui_path" -name "put_*_model_files_here" -type f -delete 2>/dev/null || true
+            find "$comfyui_path" -name "put_*_models_here" -type f -delete 2>/dev/null || true
+            
+            # For directories that AI-Dock already manages (checkpoints, vae, lora, etc.),
+            # the symlinks should already exist. Only create new symlinks for non-standard directories.
+            if [[ "$comfyui_dir" == "diffusion_models" || "$comfyui_dir" == "clip_vision" || "$comfyui_dir" == "text_encoders" ]]; then
+                # These are non-standard directories that need manual symlink management
+                if [[ ! -L "$comfyui_path" ]] || [[ "$(readlink "$comfyui_path" 2>/dev/null)" != "$storage_path" ]]; then
+                    # Remove existing file/directory if it's not a symlink to the right place
+                    if [[ -e "$comfyui_path" ]] && [[ ! -L "$comfyui_path" || "$(readlink "$comfyui_path" 2>/dev/null)" != "$storage_path" ]]; then
+                        rm -rf "$comfyui_path"
+                    fi
+                    
+                    ln -sf "$storage_path" "$comfyui_path"
+                    printf "  Created symlink: %s -> %s\n" "$comfyui_path" "$storage_path"
+                fi
+            else
+                # For standard directories, just ensure the storage path exists
+                # AI-Dock should handle the symlinks automatically
+                printf "  Storage directory ensured: %s\n" "$storage_path"
+            fi
         fi
-        if [[ -f "${comfyui_path}/put_${comfyui_dir}_model_files_here" ]]; then
-            rm -f "${comfyui_path}/put_${comfyui_dir}_model_files_here"
-        fi
-        if [[ -f "${comfyui_path}/put_text_encoder_files_here" ]]; then
-            rm -f "${comfyui_path}/put_text_encoder_files_here"
-        fi
-        if [[ -f "${comfyui_path}/put_clip_vision_models_here" ]]; then
-            rm -f "${comfyui_path}/put_clip_vision_models_here"
-        fi
-        if [[ -f "${comfyui_path}/put_diffusion_model_files_here" ]]; then
-            rm -f "${comfyui_path}/put_diffusion_model_files_here"
-        fi
-        if [[ -f "${comfyui_path}/put_vae_here" ]]; then
-            rm -f "${comfyui_path}/put_vae_here"
-        fi
-        
-        # Create individual file symlinks for each model that will be downloaded
-        case "$comfyui_dir" in
-            "diffusion_models")
-                ln -sf "${storage_path}/wan2.1_i2v_480p_14B_fp16.safetensors" "${comfyui_path}/wan2.1_i2v_480p_14B_fp16.safetensors"
-                printf "  Created symlink: %s/wan2.1_i2v_480p_14B_fp16.safetensors -> %s/wan2.1_i2v_480p_14B_fp16.safetensors\n" "$comfyui_path" "$storage_path"
-                ;;
-            "clip_vision")
-                ln -sf "${storage_path}/clip_vision_h.safetensors" "${comfyui_path}/clip_vision_h.safetensors"
-                printf "  Created symlink: %s/clip_vision_h.safetensors -> %s/clip_vision_h.safetensors\n" "$comfyui_path" "$storage_path"
-                ;;
-            "text_encoders")
-                ln -sf "${storage_path}/umt5_xxl_fp8_e4m3fn_scaled.safetensors" "${comfyui_path}/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-                printf "  Created symlink: %s/umt5_xxl_fp8_e4m3fn_scaled.safetensors -> %s/umt5_xxl_fp8_e4m3fn_scaled.safetensors\n" "$comfyui_path" "$storage_path"
-                ;;
-            "vae")
-                # VAE already has proper AI-Dock symlinks, just ensure the file will be there
-                printf "  VAE directory already configured by AI-Dock\n"
-                ;;
-        esac
     done
 }
 
