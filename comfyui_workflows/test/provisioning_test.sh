@@ -73,8 +73,50 @@ function provisioning_start() {
 
     # Auto-create symlinks for any required model directories
     provisioning_ensure_symlinks
+    provisioning_setup_syncthing
     
     provisioning_print_end
+}
+
+function provisioning_setup_syncthing() {
+    if [[ -z "$LOCAL_SYNCTHING_DEVICE_ID" ]]; then
+        printf "Skipping Syncthing setup: LOCAL_SYNCTHING_DEVICE_ID not set.\n"
+        return 0
+    fi
+
+    printf "Setting up Syncthing for two-way sync...\n"
+
+    # Wait for Syncthing to be ready
+    printf "Waiting for Syncthing to start...\n"
+    until curl -s http://localhost:8384/rest/system/ping > /dev/null; do
+        sleep 5
+    done
+    printf "Syncthing UI is accessible.\n"
+
+    # Get remote Syncthing device ID
+    REMOTE_SYNCTHING_DEVICE_ID=$(syncthing cli config devices | grep -oP '(?<="id": ")[^"]+' | head -n 1)
+    printf "Remote Syncthing Device ID: %s\n" "$REMOTE_SYNCTHING_DEVICE_ID"
+
+    # Add local device as a remote device
+    printf "Adding local Syncthing device %s...\n" "$LOCAL_SYNCTHING_DEVICE_ID"
+    syncthing cli config devices add "$LOCAL_SYNCTHING_DEVICE_ID" --name "Local_My_Drive" --introducer=false --compression=metadata --auto-accept-folders=true
+
+    # Add shared folder
+    SYNC_FOLDER_PATH="/workspace/synced_data"
+    SYNC_FOLDER_ID="vast-ai-synced-data"
+    printf "Adding shared folder %s with ID %s...\n" "$SYNC_FOLDER_PATH" "$SYNC_FOLDER_ID"
+    mkdir -p "$SYNC_FOLDER_PATH"
+    syncthing cli config folders add "$SYNC_FOLDER_ID" --path "$SYNC_FOLDER_PATH" --label "Vast.ai Synced Data" --type sendreceive
+
+    # Link the folder to the remote device
+    printf "Linking folder %s to device %s...\n" "$SYNC_FOLDER_ID" "$LOCAL_SYNCTHING_DEVICE_ID"
+    syncthing cli config folders devices "$SYNC_FOLDER_ID" add "$LOCAL_SYNCTHING_DEVICE_ID"
+
+    # Save and restart Syncthing
+    printf "Saving Syncthing configuration and restarting...\n"
+    syncthing cli config save
+    supervisorctl restart syncthing
+    printf "Syncthing setup complete.\n"
 }
 
 function pip_install() {
