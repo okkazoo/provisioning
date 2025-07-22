@@ -79,8 +79,8 @@ function provisioning_start() {
 }
 
 function provisioning_setup_syncthing() {
-    if [[ -z "$LOCAL_SYNCTHING_DEVICE_ID" ]]; then
-        printf "Skipping Syncthing setup: LOCAL_SYNCTHING_DEVICE_ID not set.\n"
+    if [[ -z "$SYNCTHING_DEVICE_ID" ]]; then
+        printf "Skipping Syncthing setup: SYNCTHING_DEVICE_ID not set.\n"
         return 0
     fi
 
