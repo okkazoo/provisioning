@@ -16,12 +16,10 @@ NODES=(
 
 # Diffusion Models placed in /opt/ComfyUI/models/diffusion_models
 CHECKPOINT_MODELS=(
-    "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt"  # Base SD 1.5
 )
 
 # VAE Models placed in /opt/ComfyUI/models/vae
 VAE_MODELS=(
-    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors"  # Essential VAE
 )
 
 # CLIP Vision Models placed in /opt/ComfyUI/models/clip_vision
@@ -102,11 +100,11 @@ function provisioning_setup_syncthing() {
     syncthing cli config devices add "$LOCAL_SYNCTHING_DEVICE_ID" --name "Local_My_Drive" --introducer=false --compression=metadata --auto-accept-folders=true
 
     # Add shared folder
-    SYNC_FOLDER_PATH="/workspace/synced_data"
-    SYNC_FOLDER_ID="vast-ai-synced-data"
+    SYNC_FOLDER_PATH="/workspace"
+    SYNC_FOLDER_ID="vast-ai-workspace"
     printf "Adding shared folder %s with ID %s...\n" "$SYNC_FOLDER_PATH" "$SYNC_FOLDER_ID"
     mkdir -p "$SYNC_FOLDER_PATH"
-    syncthing cli config folders add "$SYNC_FOLDER_ID" --path "$SYNC_FOLDER_PATH" --label "Vast.ai Synced Data" --type sendreceive
+    syncthing cli config folders add "$SYNC_FOLDER_ID" --path "$SYNC_FOLDER_PATH" --label "Vast.ai Workspace" --type sendreceive
 
     # Link the folder to the remote device
     printf "Linking folder %s to device %s...\n" "$SYNC_FOLDER_ID" "$LOCAL_SYNCTHING_DEVICE_ID"
