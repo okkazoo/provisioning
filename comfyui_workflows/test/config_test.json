@@ -1,0 +1,38 @@
+{
+  "docker_image": "ghcr.io/okkazoo/comfyui-aidock:pytorch-2.3.0-py3.10-v2-cuda-12.1.1-base-22.04",
+  "provisioning_script": "https://raw.githubusercontent.com/okkazoo/provisioning/main/comfyui_workflows/none/provisioning_test.sh",
+  "docker_login": {
+    "username": "{{DOCKER_USERNAME}}",
+    "password": "{{DOCKER_PASSWORD}}",
+    "registry": "ghcr.io"
+  },
+  "env_vars": {
+    "OPEN_BUTTON_PORT": "1111",
+    "OPEN_BUTTON_TOKEN": "1",
+    "JUPYTER_DIR": "/",
+    "DATA_DIRECTORY": "/workspace/",
+    "PROVISIONING_SCRIPT": "{{provisioning_script}}",
+    "PORTAL_CONFIG": "localhost:1111:11111:/:Instance Portal|localhost:8188:18188:/:ComfyUI|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing",
+    "SYNCTHING_UI_PORT_HOST": "8384",
+    "SYNCTHING_TRANSPORT_PORT_HOST": "72299",
+    "COMFYUI_ARGS": "--disable-auto-launch --port 18188 --enable-cors-header",
+    "WEB_ENABLE_AUTH": "{{WEB_ENABLE_AUTH}}",
+    "WEB_USER": "{{WEB_USER}}",
+    "WEB_PASSWORD": "{{WEB_PASSWORD}}",
+    "HF_TOKEN": "{{HF_TOKEN}}",
+    "CIVITAI_TOKEN": "{{CIVITAI_API_KEY}}",
+    "COMFYUI_DISABLE_REGISTRY": "true",
+    "DOCKER_USERNAME": "{{DOCKER_USERNAME}}",
+    "DOCKER_PASSWORD": "{{DOCKER_PASSWORD}}",
+    "SYNCTHING_DEVICE_ID": "{{SYNCTHING_DEVICE_ID}}"
+  },
+  "vast_create_args": {
+    "disk": "100",
+    "onstart-cmd": "init.sh",
+    "jupyter": true,
+    "ssh": true,
+    "direct": true,
+    "label": "tag={{workflow_tag}}"
+  },
+  "port_mappings": "-p 1111:1111 -p 8080:8080 -p 8384:8384 -p 72299:72299 -p 8188:8188 -v \"H:\\My Drive:/workspace\""
+}
