@@ -3,6 +3,33 @@
 # This file will be sourced in init.sh
 # Base provisioning script for ComfyUI with essential components only
 
+# Source workspace verification functions
+if curl -s https://raw.githubusercontent.com/okkazoo/provisioning/main/helper_scripts/workspace_verification.sh > /tmp/workspace_verification.sh; then
+    source /tmp/workspace_verification.sh
+    printf "✅ Loaded workspace verification functions\n"
+else
+    printf "⚠️ Could not load workspace verification functions\n"
+fi
+
+# 🟩 Install rclone + mount GDrive if config is present
+if [[ -n "$GDRIVE_RCLONE_CONF" ]]; then
+    echo "🔌 Installing rclone and mounting Google Drive..."
+    apt-get update && apt-get install -y rclone fuse
+
+    mkdir -p /root/.config/rclone
+    echo "$GDRIVE_RCLONE_CONF" > /root/.config/rclone/rclone.conf
+
+    mkdir -p /workspace
+    rclone mount gdrive:/ComfyUI /workspace \
+      --allow-other \
+      --vfs-cache-mode writes \
+      --daemon
+
+    echo "✅ Google Drive mounted at /workspace"
+else
+    echo "⚠️ GDRIVE_RCLONE_CONF not set — skipping Google Drive mount"
+fi
+
 APT_PACKAGES=(
 )
 
@@ -46,13 +73,21 @@ CONTROLNET_MODELS=(
 ### DO NOT EDIT BELOW HERE UNLESS YOU KNOW WHAT YOU ARE DOING ###
 
 function provisioning_start() {
-    if [[ ! -d /opt/environments/python ]]; then 
+    if [[ ! -d /opt/environments/python ]]; then
         export MAMBA_BASE=true
     fi
     source /opt/ai-dock/etc/environment.sh
     source /opt/ai-dock/bin/venv-set.sh comfyui
 
     provisioning_print_header
+    
+    # Verify workspace mounting before proceeding
+    if command -v provisioning_verify_workspace >/dev/null 2>&1; then
+        provisioning_verify_workspace
+    else
+        printf "⚠️ Workspace verification not available - proceeding without verification\n"
+    fi
+    
     provisioning_get_apt_packages
     provisioning_get_nodes
     provisioning_get_pip_packages
