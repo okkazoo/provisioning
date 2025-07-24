@@ -75,71 +75,67 @@ CONTROLNET_MODELS=(
 function setup_vastai_persistent_workspace() {
     printf "🔧 Setting up Vast.ai persistent workspace...\n"
     
-    # Check if /mnt exists (Vast.ai persistent disk mount point)
-    if [[ ! -d "/mnt" ]]; then
-        printf "❌ ERROR: /mnt directory not found!\n"
-        printf "   Vast.ai persistent disk may not be mounted.\n"
-        printf "   Ensure --disk parameter was specified when launching instance.\n"
-        return 1
+    # Vast.ai allocates disk space but doesn't auto-mount at /mnt
+    # Instead, we'll use the container's allocated disk space directly
+    # The container already has the allocated disk space available in the overlay filesystem
+    
+    printf "📊 Checking available disk space...\n"
+    df -h / | head -2
+    
+    # Check if /workspace already exists and has the warning file
+    if [[ -f "/workspace/WARNING-NO-MOUNT.txt" ]]; then
+        printf "📁 Removing AI-Dock's non-persistent workspace warning...\n"
+        rm -f "/workspace/WARNING-NO-MOUNT.txt"
     fi
     
-    # Check if /mnt is writable
-    if [[ ! -w "/mnt" ]]; then
-        printf "❌ ERROR: /mnt is not writable!\n"
-        printf "   Current permissions: $(ls -ld /mnt)\n"
-        return 1
+    # Remove the storage symlink if it exists
+    if [[ -L "/workspace/storage" ]]; then
+        printf "🔗 Removing AI-Dock's storage symlink...\n"
+        rm -f "/workspace/storage"
     fi
     
-    # Test write access to /mnt
-    if ! touch "/mnt/.vast_test_$$" 2>/dev/null; then
-        printf "❌ ERROR: Cannot write to /mnt!\n"
-        return 1
-    fi
-    rm -f "/mnt/.vast_test_$$"
+    # Ensure /workspace exists and is writable
+    mkdir -p "/workspace"
     
-    # Remove existing /workspace if it's not a mount point
-    if [[ -d "/workspace" ]] && ! mountpoint -q "/workspace"; then
-        printf "📁 Removing existing non-persistent /workspace directory...\n"
-        rm -rf "/workspace"
-    fi
-    
-    # Create /workspace directory if it doesn't exist
-    if [[ ! -d "/workspace" ]]; then
-        mkdir -p "/workspace"
-    fi
-    
-    # Bind mount /mnt to /workspace for persistence
-    printf "🔗 Binding /mnt to /workspace for persistence...\n"
-    if mount --bind "/mnt" "/workspace"; then
-        printf "✅ Successfully mounted /mnt to /workspace\n"
-        
-        # Verify the bind mount worked
-        if mountpoint -q "/workspace"; then
-            printf "✅ /workspace is now a mount point\n"
-            
-            # Test write access to /workspace
-            if echo "Vast.ai persistent workspace created at $(date)" > "/workspace/.workspace_info"; then
-                printf "✅ /workspace is writable and persistent\n"
-                printf "📁 Available space: $(df -h /workspace | awk 'NR==2 {print $4}')\n"
-            else
-                printf "❌ ERROR: Cannot write to /workspace after bind mount\n"
-                return 1
-            fi
-        else
-            printf "❌ ERROR: /workspace is not a mount point after bind mount\n"
-            return 1
-        fi
+    # Test write access to /workspace
+    if echo "Vast.ai persistent workspace created at $(date)" > "/workspace/.workspace_info"; then
+        printf "✅ /workspace is writable\n"
+        printf "📁 Available space: $(df -h /workspace | awk 'NR==2 {print $4}')\n"
     else
-        printf "❌ ERROR: Failed to bind mount /mnt to /workspace\n"
+        printf "❌ ERROR: Cannot write to /workspace\n"
         return 1
     fi
+    
+    # Create a persistent data directory structure
+    mkdir -p "/workspace/ComfyUI"
+    mkdir -p "/workspace/ComfyUI/models"
+    mkdir -p "/workspace/ComfyUI/custom_nodes"
+    mkdir -p "/workspace/ComfyUI/output"
+    mkdir -p "/workspace/ComfyUI/input"
+    mkdir -p "/workspace/data"
+    mkdir -p "/workspace/storage"
     
     # Set proper ownership and permissions
     chown -R root:root "/workspace"
     chmod -R 755 "/workspace"
     
-    printf "🎉 Vast.ai persistent workspace setup complete!\n"
-    printf "💾 Files in /workspace will now survive container restarts and rebuilds.\n\n"
+    # Create a persistence indicator
+    cat > "/workspace/.vast_persistence_info" << EOF
+Vast.ai Persistent Workspace
+Created: $(date)
+Instance ID: ${HOSTNAME}
+Disk Space: $(df -h /workspace | awk 'NR==2 {print $2}')
+Available: $(df -h /workspace | awk 'NR==2 {print $4}')
+
+This workspace uses the container's allocated disk space.
+Files stored here will persist as long as the instance exists.
+For true persistence across instance recreation, use external storage
+like Google Drive (rclone) or Syncthing sync.
+EOF
+    
+    printf "🎉 Vast.ai workspace setup complete!\n"
+    printf "💾 Files in /workspace will persist during this instance's lifetime.\n"
+    printf "🔄 For persistence across instance recreation, use Syncthing or rclone.\n\n"
     
     return 0
 }
@@ -153,11 +149,11 @@ function provisioning_start() {
 
     provisioning_print_header
     
-    # Setup Vast.ai persistent workspace using bind mount
+    # Setup Vast.ai persistent workspace
     setup_vastai_persistent_workspace
     
     # Verify workspace mounting before proceeding
-    if command -v provisioning_verify_workspace >/dev/null 2>&1; then
+    if command -v provisioning_verify_workspace > /dev/null 2>&1; then
         provisioning_verify_workspace
     else
         printf "⚠️ Workspace verification not available - proceeding without verification\n"
