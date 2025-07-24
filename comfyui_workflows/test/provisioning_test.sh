@@ -72,6 +72,78 @@ CONTROLNET_MODELS=(
 
 ### DO NOT EDIT BELOW HERE UNLESS YOU KNOW WHAT YOU ARE DOING ###
 
+function setup_vastai_persistent_workspace() {
+    printf "🔧 Setting up Vast.ai persistent workspace...\n"
+    
+    # Check if /mnt exists (Vast.ai persistent disk mount point)
+    if [[ ! -d "/mnt" ]]; then
+        printf "❌ ERROR: /mnt directory not found!\n"
+        printf "   Vast.ai persistent disk may not be mounted.\n"
+        printf "   Ensure --disk parameter was specified when launching instance.\n"
+        return 1
+    fi
+    
+    # Check if /mnt is writable
+    if [[ ! -w "/mnt" ]]; then
+        printf "❌ ERROR: /mnt is not writable!\n"
+        printf "   Current permissions: $(ls -ld /mnt)\n"
+        return 1
+    fi
+    
+    # Test write access to /mnt
+    if ! touch "/mnt/.vast_test_$$" 2>/dev/null; then
+        printf "❌ ERROR: Cannot write to /mnt!\n"
+        return 1
+    fi
+    rm -f "/mnt/.vast_test_$$"
+    
+    # Remove existing /workspace if it's not a mount point
+    if [[ -d "/workspace" ]] && ! mountpoint -q "/workspace"; then
+        printf "📁 Removing existing non-persistent /workspace directory...\n"
+        rm -rf "/workspace"
+    fi
+    
+    # Create /workspace directory if it doesn't exist
+    if [[ ! -d "/workspace" ]]; then
+        mkdir -p "/workspace"
+    fi
+    
+    # Bind mount /mnt to /workspace for persistence
+    printf "🔗 Binding /mnt to /workspace for persistence...\n"
+    if mount --bind "/mnt" "/workspace"; then
+        printf "✅ Successfully mounted /mnt to /workspace\n"
+        
+        # Verify the bind mount worked
+        if mountpoint -q "/workspace"; then
+            printf "✅ /workspace is now a mount point\n"
+            
+            # Test write access to /workspace
+            if echo "Vast.ai persistent workspace created at $(date)" > "/workspace/.workspace_info"; then
+                printf "✅ /workspace is writable and persistent\n"
+                printf "📁 Available space: $(df -h /workspace | awk 'NR==2 {print $4}')\n"
+            else
+                printf "❌ ERROR: Cannot write to /workspace after bind mount\n"
+                return 1
+            fi
+        else
+            printf "❌ ERROR: /workspace is not a mount point after bind mount\n"
+            return 1
+        fi
+    else
+        printf "❌ ERROR: Failed to bind mount /mnt to /workspace\n"
+        return 1
+    fi
+    
+    # Set proper ownership and permissions
+    chown -R root:root "/workspace"
+    chmod -R 755 "/workspace"
+    
+    printf "🎉 Vast.ai persistent workspace setup complete!\n"
+    printf "💾 Files in /workspace will now survive container restarts and rebuilds.\n\n"
+    
+    return 0
+}
+
 function provisioning_start() {
     if [[ ! -d /opt/environments/python ]]; then
         export MAMBA_BASE=true
@@ -80,6 +152,9 @@ function provisioning_start() {
     source /opt/ai-dock/bin/venv-set.sh comfyui
 
     provisioning_print_header
+    
+    # Setup Vast.ai persistent workspace using bind mount
+    setup_vastai_persistent_workspace
     
     # Verify workspace mounting before proceeding
     if command -v provisioning_verify_workspace >/dev/null 2>&1; then
