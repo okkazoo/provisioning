@@ -235,44 +235,56 @@ function provisioning_start() {
 }
 
 function provisioning_setup_syncthing() {
-    if [[ -z "$SYNCTHING_DEVICE_ID" ]]; then
-        printf "Skipping Syncthing setup: SYNCTHING_DEVICE_ID not set.\n"
-        return 0
-    fi
-
-    printf "Setting up Syncthing for two-way sync...\n"
-
+    printf "🔄 Setting up Syncthing for peer-to-peer sync...\n"
+    
     # Wait for Syncthing to be ready
-    printf "Waiting for Syncthing to start...\n"
-    until curl -s http://localhost:8384/rest/system/ping > /dev/null; do
-        sleep 5
+    printf "⏳ Waiting for Syncthing to start...\n"
+    local max_wait=60
+    local wait_count=0
+    
+    until curl -s http://localhost:8384/rest/system/ping > /dev/null 2>&1; do
+        sleep 2
+        wait_count=$((wait_count + 2))
+        if [ $wait_count -ge $max_wait ]; then
+            printf "⚠️ Syncthing UI not accessible after ${max_wait}s - manual setup required\n"
+            break
+        fi
     done
-    printf "Syncthing UI is accessible.\n"
-
-    # Get remote Syncthing device ID
-    REMOTE_SYNCTHING_DEVICE_ID=$(syncthing cli config devices | grep -oP '(?<="id": ")[^"]+' | head -n 1)
-    printf "Remote Syncthing Device ID: %s\n" "$REMOTE_SYNCTHING_DEVICE_ID"
-
-    # Add local device as a remote device
-    printf "Adding local Syncthing device %s...\n" "$LOCAL_SYNCTHING_DEVICE_ID"
-    syncthing cli config devices add "$LOCAL_SYNCTHING_DEVICE_ID" --name "Local_My_Drive" --introducer=false --compression=metadata --auto-accept-folders=true
-
-    # Add shared folder
-    SYNC_FOLDER_PATH="/workspace"
-    SYNC_FOLDER_ID="vast-ai-workspace"
-    printf "Adding shared folder %s with ID %s...\n" "$SYNC_FOLDER_PATH" "$SYNC_FOLDER_ID"
-    mkdir -p "$SYNC_FOLDER_PATH"
-    syncthing cli config folders add "$SYNC_FOLDER_ID" --path "$SYNC_FOLDER_PATH" --label "Vast.ai Workspace" --type sendreceive
-
-    # Link the folder to the remote device
-    printf "Linking folder %s to device %s...\n" "$SYNC_FOLDER_ID" "$LOCAL_SYNCTHING_DEVICE_ID"
-    syncthing cli config folders devices "$SYNC_FOLDER_ID" add "$LOCAL_SYNCTHING_DEVICE_ID"
-
-    # Save and restart Syncthing
-    printf "Saving Syncthing configuration and restarting...\n"
-    syncthing cli config save
-    supervisorctl restart syncthing
-    printf "Syncthing setup complete.\n"
+    
+    if curl -s http://localhost:8384/rest/system/ping > /dev/null 2>&1; then
+        printf "✅ Syncthing UI is accessible at port 8384\n"
+        
+        # Get this instance's device ID safely
+        local instance_device_id
+        if instance_device_id=$(curl -s http://localhost:8384/rest/system/status 2>/dev/null | grep -o '"myID":"[^"]*"' | cut -d'"' -f4); then
+            printf "📱 This instance's Syncthing Device ID: %s\n" "$instance_device_id"
+        else
+            printf "⚠️ Could not retrieve instance device ID via API\n"
+        fi
+        
+        # Show setup instructions
+        printf "\n📋 Syncthing Manual Setup Instructions:\n"
+        printf "1. Access Syncthing UI via portal at port 8384\n"
+        printf "2. Go to 'Actions' → 'Show ID' to see this instance's device ID\n"
+        
+        if [[ -n "$SYNCTHING_DEVICE_ID" ]]; then
+            printf "3. Add your device (ID: %s) to this instance\n" "$SYNCTHING_DEVICE_ID"
+            printf "4. Share the '/workspace' folder between devices\n"
+        else
+            printf "3. Add your local device to this instance using its device ID\n"
+            printf "4. Share the '/workspace' folder between devices\n"
+        fi
+        
+        printf "5. Accept the pairing on your local device\n"
+        printf "6. Files will sync automatically in real-time\n"
+        printf "\n💡 Manual setup is more reliable than automatic configuration\n"
+        
+    else
+        printf "❌ Syncthing UI not accessible - check if service is running\n"
+        printf "💡 You can still access it later via the portal\n"
+    fi
+    
+    printf "✅ Syncthing setup guidance complete\n"
 }
 
 function pip_install() {
