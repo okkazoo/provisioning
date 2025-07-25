@@ -235,7 +235,7 @@ function provisioning_start() {
 }
 
 function provisioning_setup_syncthing() {
-    printf "🔄 Setting up Syncthing for peer-to-peer sync...\n"
+    printf "🔄 Setting up automated Syncthing sync...\n"
     
     # Wait for Syncthing to be ready
     printf "⏳ Waiting for Syncthing to start...\n"
@@ -246,45 +246,169 @@ function provisioning_setup_syncthing() {
         sleep 2
         wait_count=$((wait_count + 2))
         if [ $wait_count -ge $max_wait ]; then
-            printf "⚠️ Syncthing UI not accessible after ${max_wait}s - manual setup required\n"
-            break
+            printf "⚠️ Syncthing UI not accessible after ${max_wait}s - skipping automation\n"
+            return 1
         fi
     done
     
-    if curl -s http://localhost:8384/rest/system/ping > /dev/null 2>&1; then
-        printf "✅ Syncthing UI is accessible at port 8384\n"
-        
-        # Get this instance's device ID safely
-        local instance_device_id
-        if instance_device_id=$(curl -s http://localhost:8384/rest/system/status 2>/dev/null | grep -o '"myID":"[^"]*"' | cut -d'"' -f4); then
-            printf "📱 This instance's Syncthing Device ID: %s\n" "$instance_device_id"
-        else
-            printf "⚠️ Could not retrieve instance device ID via API\n"
-        fi
-        
-        # Show setup instructions
-        printf "\n📋 Syncthing Manual Setup Instructions:\n"
-        printf "1. Access Syncthing UI via portal at port 8384\n"
-        printf "2. Go to 'Actions' → 'Show ID' to see this instance's device ID\n"
-        
-        if [[ -n "$SYNCTHING_DEVICE_ID" ]]; then
-            printf "3. Add your device (ID: %s) to this instance\n" "$SYNCTHING_DEVICE_ID"
-            printf "4. Share the '/workspace' folder between devices\n"
-        else
-            printf "3. Add your local device to this instance using its device ID\n"
-            printf "4. Share the '/workspace' folder between devices\n"
-        fi
-        
-        printf "5. Accept the pairing on your local device\n"
-        printf "6. Files will sync automatically in real-time\n"
-        printf "\n💡 Manual setup is more reliable than automatic configuration\n"
-        
+    printf "✅ Syncthing UI is accessible at port 8384\n"
+    
+    # Get this instance's device ID
+    local instance_device_id
+    if instance_device_id=$(curl -s http://localhost:8384/rest/system/status 2>/dev/null | grep -o '"myID":"[^"]*"' | cut -d'"' -f4); then
+        printf "📱 Instance Device ID: %s\n" "$instance_device_id"
     else
-        printf "❌ Syncthing UI not accessible - check if service is running\n"
-        printf "💡 You can still access it later via the portal\n"
+        printf "⚠️ Could not retrieve instance device ID - skipping automation\n"
+        return 1
     fi
     
-    printf "✅ Syncthing setup guidance complete\n"
+    # Check if we have the required environment variables for automation
+    if [[ -n "$SYNCTHING_DEVICE_ID" && -n "$SYNCTHING_API_KEY" ]]; then
+        printf "🤖 Starting automated Syncthing configuration...\n"
+        
+        # Generate instance-specific folder ID and path
+        local instance_id="${HOSTNAME:-unknown}"
+        local folder_id="vast-${instance_id}"
+        local folder_label="Vast.ai Instance ${instance_id}"
+        
+        printf "📁 Instance-specific folder: %s\n" "$folder_id"
+        
+        # Set API key for authentication
+        local api_key="$SYNCTHING_API_KEY"
+        
+        # Add your local device to this instance
+        printf "🔗 Adding your device to this instance...\n"
+        local add_device_result
+        add_device_result=$(curl -s -X POST \
+            -H "X-API-Key: $api_key" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"deviceID\": \"$SYNCTHING_DEVICE_ID\",
+                \"name\": \"Local-Device\",
+                \"addresses\": [\"dynamic\"],
+                \"compression\": \"metadata\",
+                \"introducer\": false,
+                \"skipIntroductionRemovals\": false,
+                \"introducedBy\": \"\",
+                \"paused\": false,
+                \"allowedNetworks\": [],
+                \"autoAcceptFolders\": true,
+                \"maxSendKbps\": 0,
+                \"maxRecvKbps\": 0,
+                \"ignoredFolders\": [],
+                \"pendingFolders\": [],
+                \"maxRequestKiB\": 0
+            }" \
+            "http://localhost:8384/rest/config/devices")
+        
+        if [[ $? -eq 0 ]]; then
+            printf "✅ Device added successfully\n"
+        else
+            printf "⚠️ Device may already exist or API call failed\n"
+        fi
+        
+        # Create instance-specific folder configuration
+        printf "📂 Creating instance-specific folder configuration...\n"
+        local add_folder_result
+        add_folder_result=$(curl -s -X POST \
+            -H "X-API-Key: $api_key" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"id\": \"$folder_id\",
+                \"label\": \"$folder_label\",
+                \"filesystemType\": \"basic\",
+                \"path\": \"/workspace\",
+                \"type\": \"sendreceive\",
+                \"devices\": [
+                    {\"deviceID\": \"$instance_device_id\", \"introducedBy\": \"\", \"encryptionPassword\": \"\"},
+                    {\"deviceID\": \"$SYNCTHING_DEVICE_ID\", \"introducedBy\": \"\", \"encryptionPassword\": \"\"}
+                ],
+                \"rescanIntervalS\": 3600,
+                \"fsWatcherEnabled\": true,
+                \"fsWatcherDelayS\": 10,
+                \"ignorePerms\": false,
+                \"autoNormalize\": true,
+                \"minDiskFree\": {\"value\": 1, \"unit\": \"%\"},
+                \"versioning\": {\"type\": \"\", \"params\": {}},
+                \"copiers\": 0,
+                \"pullerMaxPendingKiB\": 0,
+                \"hashers\": 0,
+                \"order\": \"random\",
+                \"ignoreDelete\": false,
+                \"scanProgressIntervalS\": 0,
+                \"pullerPauseS\": 0,
+                \"maxConflicts\": 10,
+                \"disableSparseFiles\": false,
+                \"disableTempIndexes\": false,
+                \"paused\": false,
+                \"weakHashThresholdPct\": 25,
+                \"markerName\": \".stfolder\",
+                \"copyOwnershipFromParent\": false,
+                \"modTimeWindowS\": 0,
+                \"maxConcurrentWrites\": 2,
+                \"disableFsync\": false,
+                \"blockPullOrder\": \"standard\",
+                \"copyRangeMethod\": \"standard\",
+                \"caseSensitiveFS\": true,
+                \"junctionsAsDirs\": false,
+                \"syncOwnership\": false,
+                \"sendOwnership\": false,
+                \"syncXattrs\": false,
+                \"sendXattrs\": false,
+                \"xattrFilter\": {\"entries\": [], \"maxSingleEntrySize\": 1024, \"maxTotalSize\": 4096}
+            }" \
+            "http://localhost:8384/rest/config/folders")
+        
+        if [[ $? -eq 0 ]]; then
+            printf "✅ Folder configuration created\n"
+        else
+            printf "⚠️ Folder configuration failed or already exists\n"
+        fi
+        
+        # Restart Syncthing to apply configuration
+        printf "🔄 Restarting Syncthing to apply configuration...\n"
+        curl -s -X POST -H "X-API-Key: $api_key" "http://localhost:8384/rest/system/restart" > /dev/null
+        
+        # Wait for restart
+        sleep 5
+        
+        # Wait for Syncthing to come back online
+        local restart_wait=30
+        local restart_count=0
+        until curl -s http://localhost:8384/rest/system/ping > /dev/null 2>&1; do
+            sleep 2
+            restart_count=$((restart_count + 2))
+            if [ $restart_count -ge $restart_wait ]; then
+                printf "⚠️ Syncthing restart taking longer than expected\n"
+                break
+            fi
+        done
+        
+        printf "🎉 Automated Syncthing setup complete!\n"
+        printf "📋 Configuration Summary:\n"
+        printf "   • Instance ID: %s\n" "$instance_id"
+        printf "   • Folder ID: %s\n" "$folder_id"
+        printf "   • Local Path: /workspace\n"
+        printf "   • Your Device: %s\n" "$SYNCTHING_DEVICE_ID"
+        printf "\n💡 Recommended local folder structure:\n"
+        if [[ -n "$SYNCTHING_LOCAL_PATH" ]]; then
+            printf "   %s\\%s\\\n" "$SYNCTHING_LOCAL_PATH" "$instance_id"
+        else
+            printf "   H:\\VastAI\\%s\\\n" "$instance_id"
+        fi
+        printf "\n🔄 Files will sync automatically between devices!\n"
+        
+    else
+        printf "ℹ️ Automated setup requires SYNCTHING_API_KEY in .env file\n"
+        printf "📋 Manual Setup Instructions:\n"
+        printf "1. Access Syncthing UI via portal at port 8384\n"
+        printf "2. Add your device (ID: %s) to this instance\n" "${SYNCTHING_DEVICE_ID:-your-device-id}"
+        printf "3. Create folder with instance-specific name\n"
+        printf "4. Share the '/workspace' folder between devices\n"
+        printf "5. Use instance-specific local folders to avoid conflicts\n"
+    fi
+    
+    printf "✅ Syncthing setup complete\n"
 }
 
 function pip_install() {
