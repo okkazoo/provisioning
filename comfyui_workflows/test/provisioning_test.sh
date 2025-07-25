@@ -11,23 +11,67 @@ else
     printf "⚠️ Could not load workspace verification functions\n"
 fi
 
-# 🟩 Install rclone + mount GDrive if config is present
+# 🟩 Setup Syncthing for peer-to-peer sync (PRIMARY OPTION)
+echo "🔄 Setting up Syncthing for peer-to-peer file synchronization..."
+
+# Syncthing is already installed in AI-Dock containers
+if command -v syncthing &> /dev/null; then
+    echo "✅ Syncthing is available"
+    
+    # Get device ID for this instance
+    DEVICE_ID=$(syncthing --device-id 2>/dev/null || echo "Unable to get device ID")
+    
+    echo "📱 Syncthing Device ID: $DEVICE_ID"
+    echo "🌐 Syncthing Web UI: Available via portal at port 8384"
+    echo "🔗 Transport Port: 72299 (for peer connections)"
+    echo ""
+    echo "📋 Syncthing Setup Instructions:"
+    echo "1. Access Syncthing UI via the portal (port 8384)"
+    echo "2. Add your other devices using their device IDs"
+    echo "3. Share the '/workspace' folder with your devices"
+    echo "4. Files will sync automatically in real-time"
+    echo ""
+    echo "💡 Advantages over cloud storage:"
+    echo "   ✅ No API limits or quotas"
+    echo "   ✅ Real-time bidirectional sync"
+    echo "   ✅ Works with any device (desktop, mobile, server)"
+    echo "   ✅ No third-party cloud dependency"
+    echo "   ✅ Encrypted peer-to-peer connections"
+    
+    # If SYNCTHING_DEVICE_ID is provided, show pairing instructions
+    if [ -n "$SYNCTHING_DEVICE_ID" ]; then
+        echo ""
+        echo "🔗 Device ID from environment: $SYNCTHING_DEVICE_ID"
+        echo "💡 You can add this device to your Syncthing network"
+    fi
+    
+else
+    echo "⚠️ Syncthing not found - this shouldn't happen in AI-Dock containers"
+fi
+
+# 🟨 Install rclone as fallback option (if Google Drive config provided)
 if [[ -n "$GDRIVE_RCLONE_CONF" ]]; then
-    echo "🔌 Installing rclone and mounting Google Drive..."
+    echo ""
+    echo "🔌 Setting up rclone as fallback option..."
     apt-get update && apt-get install -y rclone fuse
 
-    mkdir -p /root/.config/rclone
-    echo "$GDRIVE_RCLONE_CONF" > /root/.config/rclone/rclone.conf
+    # Create system-wide rclone config directory (rclone expects config here)
+    mkdir -p /etc/rclone
+    echo "$GDRIVE_RCLONE_CONF" > /etc/rclone/rclone.conf
 
-    mkdir -p /workspace
-    rclone mount gdrive:/ComfyUI /workspace \
-      --allow-other \
-      --vfs-cache-mode writes \
-      --daemon
-
-    echo "✅ Google Drive mounted at /workspace"
+    # Verify rclone configuration
+    if rclone listremotes | grep -q "gdrive:"; then
+        echo "✅ rclone configured as fallback option"
+        echo "📋 Fallback sync commands (if needed):"
+        echo "   Upload:   rclone copy /workspace/ gdrive:/ComfyUI/"
+        echo "   Download: rclone copy gdrive:/ComfyUI/ /workspace/"
+        echo "   List:     rclone ls gdrive:/ComfyUI/"
+    else
+        echo "⚠️ rclone configuration may have issues - check tokens"
+    fi
 else
-    echo "⚠️ GDRIVE_RCLONE_CONF not set — skipping Google Drive mount"
+    echo "ℹ️ No GDRIVE_RCLONE_CONF provided - rclone fallback not available"
+    echo "💡 Syncthing is the recommended sync method"
 fi
 
 APT_PACKAGES=(
@@ -129,13 +173,21 @@ Available: $(df -h /workspace | awk 'NR==2 {print $4}')
 
 This workspace uses the container's allocated disk space.
 Files stored here will persist as long as the instance exists.
-For true persistence across instance recreation, use external storage
-like Google Drive (rclone) or Syncthing sync.
+
+RECOMMENDED: Use Syncthing for real-time peer-to-peer sync
+- Access Syncthing UI via portal (port 8384)
+- No cloud storage limits or API quotas
+- Works with desktop, mobile, and server devices
+- Encrypted peer-to-peer connections
+
+FALLBACK: Use rclone for Google Drive sync (if configured)
+- Manual sync commands available via SSH/terminal
 EOF
     
     printf "🎉 Vast.ai workspace setup complete!\n"
     printf "💾 Files in /workspace will persist during this instance's lifetime.\n"
-    printf "🔄 For persistence across instance recreation, use Syncthing or rclone.\n\n"
+    printf "🔄 RECOMMENDED: Use Syncthing for real-time sync across devices.\n"
+    printf "📱 Access Syncthing UI via the portal at port 8384.\n\n"
     
     return 0
 }
