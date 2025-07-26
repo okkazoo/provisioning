@@ -229,9 +229,69 @@ function provisioning_start() {
 
     # Auto-create symlinks for any required model directories
     provisioning_ensure_symlinks
+    provisioning_configure_syncthing_gui_and_usage
     provisioning_setup_syncthing
     
     provisioning_print_end
+}
+
+function provisioning_configure_syncthing_gui_and_usage() {
+    printf "⚙️ Configuring Syncthing GUI and Usage Reporting on instance...\n"
+    
+    local api_key
+    if [[ -n "$SYNCTHING_API_KEY" ]]; then
+        api_key="$SYNCTHING_API_KEY"
+    else
+        api_key=$(curl -s http://localhost:8384/rest/system/config 2>/dev/null | grep -o '"apiKey":"[^"]*"' | cut -d'"' -f4)
+    fi
+
+    local config_cmd="curl -s -X PUT -H 'Content-Type: application/json'"
+    if [[ -n "$api_key" ]]; then
+        config_cmd="$config_cmd -H 'X-API-Key: $api_key'"
+    fi
+
+    # 1. Disable Anonymous Usage Reporting
+    printf "🔕 Disabling Anonymous Usage Reporting...\n"
+    local usage_config="{ \"urAccepted\": -1 }"
+    if eval "$config_cmd -d '$usage_config' http://localhost:8384/rest/config/options" > /dev/null 2>&1; then
+        printf "✅ Usage reporting disabled.\n"
+    else
+        printf "⚠️ Failed to disable usage reporting. Manual intervention may be needed.\n"
+    fi
+
+    # 2. Set GUI Username and Password
+    if [[ -n "$SYNCTHING_USER" ]] && [[ -n "$SYNCTHING_PASSWORD" ]]; then
+        printf "🔐 Setting Syncthing GUI username and password...\n"
+        local gui_config="{ \"user\": \"$SYNCTHING_USER\", \"password\": \"$SYNCTHING_PASSWORD\", \"authMode\": \"static\", \"useTLS\": false }"
+        if eval "$config_cmd -d '$gui_config' http://localhost:8384/rest/config/gui" > /dev/null 2>&1; then
+            printf "✅ GUI authentication set.\n"
+        else
+            printf "⚠️ Failed to set GUI authentication. Manual intervention may be needed.\n"
+        fi
+    else
+        printf "ℹ️ SYNCTHING_USER or SYNCTHING_PASSWORD not provided. GUI authentication not set automatically.\n"
+    fi
+
+    printf "🔄 Restarting Syncthing to apply GUI and Usage Reporting settings...\n"
+    local restart_cmd="curl -s -X POST"
+    if [[ -n "$api_key" ]]; then
+        restart_cmd="$restart_cmd -H 'X-API-Key: $api_key'"
+    fi
+    eval "$restart_cmd http://localhost:8384/rest/system/restart" > /dev/null 2>&1
+    sleep 5 # Give Syncthing a moment to restart
+
+    # Wait for Syncthing to come back online after GUI/Usage config restart
+    local restart_wait=30
+    local restart_count=0
+    until curl -s http://localhost:8384/rest/system/ping > /dev/null 2>&1; do
+        sleep 2
+        restart_count=$((restart_count + 2))
+        if [ $restart_count -ge $restart_wait ]; then
+            printf "⚠️ Syncthing UI not accessible after GUI/Usage config restart. Continuing...\n"
+            break
+        fi
+    done
+    printf "✅ Syncthing GUI and Usage Reporting configuration complete.\n"
 }
 
 function provisioning_setup_syncthing() {
