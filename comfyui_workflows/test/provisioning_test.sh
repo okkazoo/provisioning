@@ -78,6 +78,7 @@ APT_PACKAGES=(
 )
 
 PIP_PACKAGES=(
+    watchdog
 )
 
 # Essential nodes for base functionality
