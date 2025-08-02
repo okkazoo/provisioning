@@ -5,6 +5,7 @@ APT_PACKAGES=(
 
 PIP_PACKAGES=(
     watchdog
+    comfyui
 )
 
 # Essential nodes for base functionality
@@ -14,16 +15,11 @@ NODES=(
 
 # Diffusion Models placed in /opt/ComfyUI/models/diffusion_models
 CHECKPOINT_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
 )
 
 
 # VAE Models placed in /opt/ComfyUI/models/vae
 VAE_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors"
 )
 
 
@@ -34,7 +30,7 @@ CLIP_MODELS=(
 
 # Text Encoder Models placed in /opt/ComfyUI/models/text_encoders
 TEXT_ENCODERS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+
 )
 
 
