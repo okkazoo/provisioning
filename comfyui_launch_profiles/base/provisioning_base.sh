@@ -144,6 +144,9 @@ function provisioning_start() {
     provisioning_get_apt_packages
     provisioning_get_nodes
     provisioning_get_pip_packages
+    
+    # Clone/update workflow_templates repository
+    provisioning_get_workflow_templates
 
     # Download models to AI-Dock storage directories (WORKSPACE=/opt/)
     # Auto-create symlinks for any required model directories
@@ -208,6 +211,30 @@ function provisioning_get_nodes() {
             fi
         fi
     done
+}
+
+function provisioning_get_workflow_templates() {
+    printf "Setting up workflow_templates repository...\n"
+    templates_path="/opt/workflow_templates"
+    templates_repo="https://github.com/Comfy-Org/workflow_templates.git"
+    
+    if [[ -d "$templates_path" ]]; then
+        printf "Updating workflow_templates...\n"
+        ( cd "$templates_path" && git pull origin main )
+    else
+        printf "Cloning workflow_templates...\n"
+        git clone "$templates_repo" "$templates_path"
+    fi
+    
+    # Ensure ComfyUI knows about the templates
+    if [[ -d "/opt/ComfyUI" ]]; then
+        # Create symlink in ComfyUI directory if needed
+        comfyui_templates="/opt/ComfyUI/workflow_templates"
+        if [[ ! -e "$comfyui_templates" ]]; then
+            ln -sf "$templates_path" "$comfyui_templates"
+            printf "Created symlink: %s -> %s\n" "$comfyui_templates" "$templates_path"
+        fi
+    fi
 }
 
 function provisioning_get_models() {
