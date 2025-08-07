@@ -36,29 +36,23 @@ mkdir -p models/vae
 mkdir -p models/loras
 mkdir -p models/controlnet
 
-# Download SDXL base model (using comfy-cli)
+# Download SDXL base model (using wget for non-interactive downloads)
 echo "Downloading SDXL base model..."
-comfy model download \
-  --url "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors" \
-  --relative-path "models/checkpoints/"
+wget -O "models/checkpoints/sd_xl_base_1.0.safetensors" \
+  "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors" || echo "SDXL base download failed"
 
 # Download SDXL refiner (optional)
 echo "Downloading SDXL refiner..."
-comfy model download \
-  --url "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors" \
-  --relative-path "models/checkpoints/"
+wget -O "models/checkpoints/sd_xl_refiner_1.0.safetensors" \
+  "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors" || echo "SDXL refiner download failed"
 
 # Download SDXL VAE
 echo "Downloading SDXL VAE..."
-comfy model download \
-  --url "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" \
-  --relative-path "models/vae/"
+wget -O "models/vae/sdxl_vae.safetensors" \
+  "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors" || echo "SDXL VAE download failed"
 
-# Download popular LoRAs (example)
-echo "Downloading example LoRA..."
-comfy model download \
-  --url "https://civitai.com/api/download/models/117886" \
-  --relative-path "models/loras/" || echo "LoRA download failed (may need auth)"
+# Skip LoRA download (requires auth)
+echo "Skipping LoRA download (requires authentication)"
 
 echo "=== Installing Additional Dependencies ==="
 
